@@ -297,7 +297,8 @@ const App: React.FC = () => {
                                         key={prayer.name} 
                                         prayer={prayer} 
                                         isCurrent={prayer.name === currentPrayerName}
-                                        countdown={prayer.name === currentPrayerName ? timeToNextPrayer : undefined}
+                                        isNext={prayer.name === nextPrayerName}
+                                        countdown={prayer.name === nextPrayerName ? timeToNextPrayer : undefined}
                                      />
                                 ))}
                             </div>
