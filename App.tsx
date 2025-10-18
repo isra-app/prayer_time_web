@@ -149,7 +149,10 @@ const App: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        const loadDefaultLocation = () => {
+        // This function runs on initial app load.
+        // It tries to load the user's previously saved location from local storage.
+        // If no location is saved, it defaults to Kozhikode.
+        const loadSavedOrDefaultLocation = () => {
             try {
                 const savedLocationJson = localStorage.getItem(LOCAL_STORAGE_KEY);
                 let locationToLoad: City | undefined;
@@ -160,6 +163,7 @@ const App: React.FC = () => {
                     locationToLoad = cities.find(c => c.name === savedLocation.name && c.country === savedLocation.country);
                 }
                 
+                // If no location was saved, or the saved location is invalid, use the default.
                 if (!locationToLoad) {
                     locationToLoad = cities.find(c => c.name === DEFAULT_CITY_NAME);
                 }
@@ -181,7 +185,7 @@ const App: React.FC = () => {
                  setUiState('manual');
             }
         };
-        loadDefaultLocation();
+        loadSavedOrDefaultLocation();
     }, [fetchPrayerData]);
 
     const handleCountryChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
@@ -200,6 +204,7 @@ const App: React.FC = () => {
         if (city) {
             fetchPrayerData(city.latitude, city.longitude, city.name);
             try {
+                // Save the newly selected city to local storage for persistence.
                 localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(city));
             } catch (e) {
                 console.error("Failed to save location to local storage", e);
