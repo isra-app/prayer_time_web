@@ -1,0 +1,5 @@
+{
+  "name": "prayer_times",
+  "description": "A modern web application that displays Islamic prayer times based on your current location, providing accurate timings for daily prayers. It also features an inspirational verse generator powered by Gemini.",
+  "requestFramePermissions": []
+}
