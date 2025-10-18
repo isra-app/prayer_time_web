@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import type { PrayerTimes, LocationData, Prayer, City, Country } from './types';
 import { getPrayerTimes } from './services/prayerTimeService';
@@ -6,7 +7,9 @@ import { FajrIcon, DhuhrIcon, AsrIcon, MaghribIcon, IshaIcon, SunriseIcon } from
 import PrayerTimeCard from './components/PrayerTimeCard';
 import LoadingSpinner from './components/LoadingSpinner';
 
-type UIState = 'detecting' | 'manual' | 'loading' | 'loaded' | 'error';
+type UIState = 'manual' | 'loading' | 'loaded' | 'error';
+const LOCAL_STORAGE_KEY = 'prayer-times-location';
+const DEFAULT_CITY_NAME = 'Kozhikode';
 
 const App: React.FC = () => {
     const [locationData, setLocationData] = useState<LocationData | null>(null);
@@ -17,8 +20,7 @@ const App: React.FC = () => {
     const [currentPrayerName, setCurrentPrayerName] = useState<string | null>(null);
     const [nextPrayerName, setNextPrayerName] = useState<string | null>(null);
     const [timeToNextPrayer, setTimeToNextPrayer] = useState<string | null>(null);
-    const [uiState, setUiState] = useState<UIState>('detecting');
-    const [countdown, setCountdown] = useState<number>(5);
+    const [uiState, setUiState] = useState<UIState>('loading');
 
     // State for manual selection
     const [selectedCountry, setSelectedCountry] = useState<string>('');
@@ -147,40 +149,39 @@ const App: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        if (navigator.geolocation) {
-            // Timer for UI countdown
-            const countdownInterval = setInterval(() => {
-                setCountdown(prev => (prev > 0 ? prev - 1 : 0));
-            }, 1000);
+        const loadDefaultLocation = () => {
+            try {
+                const savedLocationJson = localStorage.getItem(LOCAL_STORAGE_KEY);
+                let locationToLoad: City | undefined;
 
-            // Timer for fallback logic
-            const fallbackTimer = setTimeout(() => {
-                console.warn('Geolocation timed out after 5 seconds.');
-                setUiState(currentState => (currentState === 'detecting' ? 'manual' : currentState));
-            }, 5000);
+                if (savedLocationJson) {
+                    const savedLocation = JSON.parse(savedLocationJson) as City;
+                    // Verify the saved location still exists in our city list
+                    locationToLoad = cities.find(c => c.name === savedLocation.name && c.country === savedLocation.country);
+                }
+                
+                if (!locationToLoad) {
+                    locationToLoad = cities.find(c => c.name === DEFAULT_CITY_NAME);
+                }
 
-            navigator.geolocation.getCurrentPosition(
-                position => {
-                    clearTimeout(fallbackTimer);
-                    clearInterval(countdownInterval);
-                    fetchPrayerData(position.coords.latitude, position.coords.longitude);
-                },
-                err => {
-                    clearTimeout(fallbackTimer);
-                    clearInterval(countdownInterval);
-                    console.warn(`Geolocation error: ${err.message}`);
+                if (locationToLoad) {
+                    const countryCode = locationToLoad.country;
+                    setSelectedCountry(countryCode);
+                    setAvailableCities(cities.filter(c => c.country === countryCode));
+                    setSelectedCity(locationToLoad.name);
+                    fetchPrayerData(locationToLoad.latitude, locationToLoad.longitude, locationToLoad.name);
+                } else {
+                    console.error("Default city not found in data.");
+                    setError('Default location data is missing. Please select a location manually.');
                     setUiState('manual');
                 }
-            );
-
-            // Cleanup timers if the component unmounts
-            return () => {
-                clearTimeout(fallbackTimer);
-                clearInterval(countdownInterval);
-            };
-        } else {
-            setUiState('manual');
-        }
+            } catch (e) {
+                 console.error('Failed to load saved location:', e);
+                 setError('Could not load your saved location. Please select one manually.');
+                 setUiState('manual');
+            }
+        };
+        loadDefaultLocation();
     }, [fetchPrayerData]);
 
     const handleCountryChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
@@ -195,9 +196,14 @@ const App: React.FC = () => {
     const handleCityChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
         const cityName = event.target.value;
         setSelectedCity(cityName);
-        const city = cities.find(c => c.name === cityName);
+        const city = cities.find(c => c.name === cityName && c.country === selectedCountry);
         if (city) {
             fetchPrayerData(city.latitude, city.longitude, city.name);
+            try {
+                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(city));
+            } catch (e) {
+                console.error("Failed to save location to local storage", e);
+            }
         }
     };
     
@@ -212,21 +218,11 @@ const App: React.FC = () => {
 
     const renderContent = () => {
         switch (uiState) {
-            case 'detecting':
-                return (
-                    <div className="flex flex-col items-center justify-center h-full text-center">
-                        <LoadingSpinner />
-                        <p className="mt-4 text-lg text-[#158C6E]">Detecting your location...</p>
-                        <p className="mt-2 text-sm text-gray-500">
-                            Switching to manual selection in {countdown} seconds...
-                        </p>
-                    </div>
-                );
             case 'manual':
                  return (
                     <div className="text-center">
-                        <h1 className="text-3xl font-bold text-gray-800 mb-2">Location Not Found</h1>
-                        <p className="text-gray-600 mb-6">Please select your location manually.</p>
+                        <h1 className="text-3xl font-bold text-gray-800 mb-2">Select Location</h1>
+                        <p className="text-gray-600 mb-6">Please select your location to see prayer times.</p>
                         <div className="max-w-md mx-auto space-y-4">
                              <select
                                 value={selectedCountry}
