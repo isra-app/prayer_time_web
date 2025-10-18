@@ -313,7 +313,7 @@ const App: React.FC = () => {
 
 
     return (
-        <div className="min-h-screen bg-gray-50 text-gray-800 font-sans p-4 md:p-8 flex flex-col items-center justify-center relative">
+        <div className="min-h-screen bg-white text-gray-800 font-sans p-4 md:p-8 flex flex-col items-center justify-center relative">
              <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_top,_rgba(21,140,110,0.1),_transparent_40%)]"></div>
             <main className="w-full max-w-6xl mx-auto z-10">
                 {renderContent()}
