@@ -14,9 +14,9 @@ interface BigDataCloudResponse {
     countryName: string;
 }
 
-export async function getPrayerTimes(latitude: number, longitude: number, date: string): Promise<{ timings: PrayerTimes; locationInfo: LocationData }> {
+export async function getPrayerTimes(latitude: number, longitude: number, date: string, method: number): Promise<{ timings: PrayerTimes; locationInfo: LocationData }> {
     // Fetch prayer times
-    const prayerApiUrl = `https://api.aladhan.com/v1/timings/${date}?latitude=${latitude}&longitude=${longitude}&method=2`;
+    const prayerApiUrl = `https://api.aladhan.com/v1/timings/${date}?latitude=${latitude}&longitude=${longitude}&method=${method}`;
     const prayerResponse = await fetch(prayerApiUrl);
     if (!prayerResponse.ok) {
         throw new Error('Failed to fetch prayer times');

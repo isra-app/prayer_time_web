@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
-import type { PrayerTimes, LocationData, Prayer, City, Country } from './types';
+import type { PrayerTimes, LocationData, Prayer, City, Country, SavedData } from './types';
 import { getPrayerTimes } from './services/prayerTimeService';
 import { countries, cities } from './data/cities';
 import { FajrIcon, DhuhrIcon, AsrIcon, MaghribIcon, IshaIcon, SunriseIcon } from './components/PrayerIcons';
@@ -8,8 +7,55 @@ import PrayerTimeCard from './components/PrayerTimeCard';
 import LoadingSpinner from './components/LoadingSpinner';
 
 type UIState = 'manual' | 'loading' | 'loaded' | 'error';
-const LOCAL_STORAGE_KEY = 'prayer-times-location';
+const LOCAL_STORAGE_KEY = 'prayer-times-location-v3'; // Updated key for new data structure
 const DEFAULT_CITY_NAME = 'Kozhikode';
+
+const calculationMethodNames: { [key: number]: string } = {
+    1: 'Muslim World League',
+    2: 'ISNA (North America)',
+    3: 'Egyptian General Authority',
+    4: 'Umm Al-Qura University, Makkah',
+    5: 'University of Islamic Sciences, Karachi',
+    8: 'Kuwait',
+    10: 'Qatar',
+    11: 'Dubai (UAE)',
+    12: 'Moonsighting Committee Worldwide',
+    13: 'Ministry of Wakfs, Algeria',
+    14: 'Ministry of Habous, Morocco',
+};
+
+const getMethodForCountry = (countryCode: string): number => {
+    switch (countryCode) {
+        case 'US':
+        case 'CA':
+            return 2; // ISNA
+        case 'EG':
+        case 'JO': // Jordan
+        case 'LB': // Lebanon
+        case 'SY': // Syria
+        case 'IQ': // Iraq
+            return 3; // Egyptian
+        case 'SA':
+        case 'BH': // Bahrain
+        case 'OM': // Oman
+            return 4; // Umm Al-Qura, Makkah
+        case 'PK':
+            return 5; // University of Islamic Sciences, Karachi
+        case 'KW':
+            return 8; // Kuwait
+        case 'QA':
+            return 10; // Qatar
+        case 'AE':
+            return 11; // Dubai
+        case 'DZ': // Algeria
+        case 'TN': // Tunisia
+            return 13;
+        case 'MA': // Morocco
+            return 14;
+        default:
+            return 1; // Muslim World League (default)
+    }
+};
 
 const App: React.FC = () => {
     const [locationData, setLocationData] = useState<LocationData | null>(null);
@@ -26,7 +72,8 @@ const App: React.FC = () => {
     const [selectedCountry, setSelectedCountry] = useState<string>('');
     const [availableCities, setAvailableCities] = useState<City[]>([]);
     const [selectedCity, setSelectedCity] = useState<string>('');
-    
+    const [activeMethodName, setActiveMethodName] = useState<string>('');
+
     useEffect(() => {
         const timer = setInterval(() => {
             setCurrentTime(new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }));
@@ -125,7 +172,7 @@ const App: React.FC = () => {
 
     }, [nextPrayerName, prayerTimes]);
 
-    const fetchPrayerData = useCallback(async (latitude: number, longitude: number, cityName?: string) => {
+    const fetchPrayerData = useCallback(async (latitude: number, longitude: number, method: number, cityName?: string) => {
         setUiState('loading');
         setError(null);
         setPrayerTimes(null);
@@ -134,12 +181,13 @@ const App: React.FC = () => {
             const dateString = `${today.getDate()}-${today.getMonth() + 1}-${today.getFullYear()}`;
             setCurrentDate(today.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }));
             
-            const { timings, locationInfo } = await getPrayerTimes(latitude, longitude, dateString);
+            const { timings, locationInfo } = await getPrayerTimes(latitude, longitude, dateString, method);
             setPrayerTimes(timings);
             setLocationData({
                 city: locationInfo.city !== 'Unknown City' ? locationInfo.city : cityName || 'Selected Location',
                 countryName: locationInfo.countryName,
             });
+            setActiveMethodName(calculationMethodNames[method] || 'Default Method');
             setUiState('loaded');
         } catch (err) {
             setError('Could not fetch prayer times. Please try again later.');
@@ -149,18 +197,15 @@ const App: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        // This function runs on initial app load.
-        // It tries to load the user's previously saved location from local storage.
-        // If no location is saved, it defaults to Kozhikode.
         const loadSavedOrDefaultLocation = () => {
             try {
-                const savedLocationJson = localStorage.getItem(LOCAL_STORAGE_KEY);
+                const savedDataJson = localStorage.getItem(LOCAL_STORAGE_KEY);
                 let locationToLoad: City | undefined;
 
-                if (savedLocationJson) {
-                    const savedLocation = JSON.parse(savedLocationJson) as City;
+                if (savedDataJson) {
+                    const savedData = JSON.parse(savedDataJson) as SavedData;
                     // Verify the saved location still exists in our city list
-                    locationToLoad = cities.find(c => c.name === savedLocation.name && c.country === savedLocation.country);
+                    locationToLoad = cities.find(c => c.name === savedData.city.name && c.country === savedData.city.country);
                 }
                 
                 // If no location was saved, or the saved location is invalid, use the default.
@@ -170,10 +215,11 @@ const App: React.FC = () => {
 
                 if (locationToLoad) {
                     const countryCode = locationToLoad.country;
+                    const method = getMethodForCountry(countryCode);
                     setSelectedCountry(countryCode);
                     setAvailableCities(cities.filter(c => c.country === countryCode));
                     setSelectedCity(locationToLoad.name);
-                    fetchPrayerData(locationToLoad.latitude, locationToLoad.longitude, locationToLoad.name);
+                    fetchPrayerData(locationToLoad.latitude, locationToLoad.longitude, method, locationToLoad.name);
                 } else {
                     console.error("Default city not found in data.");
                     setError('Default location data is missing. Please select a location manually.');
@@ -202,16 +248,17 @@ const App: React.FC = () => {
         setSelectedCity(cityName);
         const city = cities.find(c => c.name === cityName && c.country === selectedCountry);
         if (city) {
-            fetchPrayerData(city.latitude, city.longitude, city.name);
+            const method = getMethodForCountry(city.country);
+            fetchPrayerData(city.latitude, city.longitude, method, city.name);
             try {
-                // Save the newly selected city to local storage for persistence.
-                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(city));
+                const dataToSave: SavedData = { city };
+                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(dataToSave));
             } catch (e) {
                 console.error("Failed to save location to local storage", e);
             }
         }
     };
-    
+
     const prayerSchedule: Prayer[] = prayerTimes ? [
         { name: 'Fajr', time: prayerTimes.Fajr, icon: <FajrIcon /> },
         { name: 'Sunrise', time: prayerTimes.Sunrise, icon: <SunriseIcon /> },
@@ -226,36 +273,46 @@ const App: React.FC = () => {
             case 'manual':
                  return (
                     <div className="text-center">
-                        <h1 className="text-3xl font-bold text-gray-800 mb-2">Select Location</h1>
-                        <p className="text-gray-600 mb-6">Please select your location to see prayer times.</p>
+                        <h1 className="text-3xl font-bold text-gray-800 mb-2">Select Your Location</h1>
+                        <p className="text-gray-600 mb-6">Choose your location for accurate prayer times.</p>
                         <div className="max-w-md mx-auto space-y-4">
-                             <select
-                                value={selectedCountry}
-                                onChange={handleCountryChange}
-                                className="w-full bg-white border border-gray-300 rounded-lg py-2 px-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#158C6E] transition-colors"
-                                aria-label="Select a country"
-                            >
-                                <option value="" disabled>Select a Country</option>
-                                {countries.map(country => (
-                                    <option key={country.code} value={country.code}>
-                                        {country.name}
-                                    </option>
-                                ))}
-                            </select>
-                            <select
-                                value={selectedCity}
-                                onChange={handleCityChange}
-                                disabled={!selectedCountry}
-                                className="w-full bg-white border border-gray-300 rounded-lg py-2 px-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#158C6E] transition-colors disabled:bg-gray-100"
-                                aria-label="Select a city"
-                            >
-                                <option value="" disabled>Select a City</option>
-                                {availableCities.map(city => (
-                                    <option key={city.name} value={city.name}>
-                                        {city.name}
-                                    </option>
-                                ))}
-                            </select>
+                             <div className="relative">
+                                <select
+                                    value={selectedCountry}
+                                    onChange={handleCountryChange}
+                                    className="w-full appearance-none bg-white border border-gray-300 rounded-lg py-2 pl-3 pr-10 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#158C6E] transition-colors"
+                                    aria-label="Select a country"
+                                >
+                                    <option value="" disabled>Select a Country</option>
+                                    {countries.map(country => (
+                                        <option key={country.code} value={country.code}>
+                                            {country.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                                </div>
+                            </div>
+                            <div className="relative">
+                                <select
+                                    value={selectedCity}
+                                    onChange={handleCityChange}
+                                    disabled={!selectedCountry}
+                                    className="w-full appearance-none bg-white border border-gray-300 rounded-lg py-2 pl-3 pr-10 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#158C6E] transition-colors disabled:bg-gray-100"
+                                    aria-label="Select a city"
+                                >
+                                    <option value="" disabled>Select a City</option>
+                                    {availableCities.map(city => (
+                                        <option key={city.name} value={city.name}>
+                                            {city.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 );
@@ -286,6 +343,7 @@ const App: React.FC = () => {
                             <div className="text-center mb-8">
                                 <h1 className="text-4xl md:text-5xl font-bold text-[#158C6E] tracking-wider">{locationData.city}</h1>
                                 <p className="text-lg text-gray-600">{locationData.countryName}</p>
+                                <p className="text-sm text-gray-500 mt-1">Using: {activeMethodName}</p>
                                 <p className="mt-4 text-md text-gray-700">{currentDate}</p>
                                 <p className="mt-2 text-3xl font-semibold text-gray-900">{currentTime}</p>
                                 <button onClick={() => setUiState('manual')} className="mt-4 text-sm text-[#158C6E] hover:underline">

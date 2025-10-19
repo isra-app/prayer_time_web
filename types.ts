@@ -32,3 +32,7 @@ export interface Country {
     name: string;
     code: string;
 }
+
+export interface SavedData {
+    city: City;
+}

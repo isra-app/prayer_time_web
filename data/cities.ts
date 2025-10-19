@@ -8,16 +8,30 @@ export const countries: Country[] = [
     { name: 'Australia', code: 'AU' },
     { name: 'Saudi Arabia', code: 'SA' },
     { name: 'United Arab Emirates', code: 'AE' },
+    { name: 'Qatar', code: 'QA' },
+    { name: 'Kuwait', code: 'KW' },
+    { name: 'Bahrain', code: 'BH' },
+    { name: 'Oman', code: 'OM' },
+    { name: 'Jordan', code: 'JO' },
+    { name: 'Lebanon', code: 'LB' },
+    { name: 'Egypt', code: 'EG' },
+    { name: 'Morocco', code: 'MA' },
+    { name: 'Algeria', code: 'DZ' },
+    { name: 'Tunisia', code: 'TN' },
+    { name: 'Iraq', code: 'IQ' },
+    { name: 'Syria', code: 'SY' },
+    { name: 'Sudan', code: 'SD' },
+    { name: 'Yemen', code: 'YE' },
     { name: 'Pakistan', code: 'PK' },
     { name: 'Indonesia', code: 'ID' },
     { name: 'Malaysia', code: 'MY' },
     { name: 'Turkey', code: 'TR' },
-    { name: 'Egypt', code: 'EG' },
     { name: 'Nigeria', code: 'NG' },
     { name: 'Bangladesh', code: 'BD' },
     { name: 'Germany', code: 'DE' },
     { name: 'France', code: 'FR' },
     { name: 'South Africa', code: 'ZA' },
+    { name: 'Singapore', code: 'SG' },
 ];
 
 export const cities: City[] = [
@@ -78,6 +92,50 @@ export const cities: City[] = [
     { name: 'Abu Dhabi', country: 'AE', latitude: 24.4539, longitude: 54.3773 },
     { name: 'Sharjah', country: 'AE', latitude: 25.3463, longitude: 55.4209 },
 
+    // Qatar
+    { name: 'Doha', country: 'QA', latitude: 25.2854, longitude: 51.5310 },
+
+    // Kuwait
+    { name: 'Kuwait City', country: 'KW', latitude: 29.3759, longitude: 47.9774 },
+
+    // Bahrain
+    { name: 'Manama', country: 'BH', latitude: 26.2285, longitude: 50.5860 },
+
+    // Oman
+    { name: 'Muscat', country: 'OM', latitude: 23.5880, longitude: 58.3829 },
+
+    // Jordan
+    { name: 'Amman', country: 'JO', latitude: 31.9539, longitude: 35.9106 },
+
+    // Lebanon
+    { name: 'Beirut', country: 'LB', latitude: 33.8938, longitude: 35.5018 },
+
+    // Egypt
+    { name: 'Cairo', country: 'EG', latitude: 30.0444, longitude: 31.2357 },
+    { name: 'Alexandria', country: 'EG', latitude: 31.2001, longitude: 29.9187 },
+
+    // Morocco
+    { name: 'Rabat', country: 'MA', latitude: 34.0209, longitude: -6.8417 },
+    { name: 'Casablanca', country: 'MA', latitude: 33.5731, longitude: -7.5898 },
+
+    // Algeria
+    { name: 'Algiers', country: 'DZ', latitude: 36.7754, longitude: 3.0597 },
+    
+    // Tunisia
+    { name: 'Tunis', country: 'TN', latitude: 36.8065, longitude: 10.1815 },
+
+    // Iraq
+    { name: 'Baghdad', country: 'IQ', latitude: 33.3152, longitude: 44.3661 },
+    
+    // Syria
+    { name: 'Damascus', country: 'SY', latitude: 33.5138, longitude: 36.2765 },
+
+    // Sudan
+    { name: 'Khartoum', country: 'SD', latitude: 15.5007, longitude: 32.5599 },
+
+    // Yemen
+    { name: 'Sana\'a', country: 'YE', latitude: 15.3694, longitude: 44.1910 },
+
     // Pakistan
     { name: 'Karachi', country: 'PK', latitude: 24.8607, longitude: 67.0011 },
     { name: 'Lahore', country: 'PK', latitude: 31.5204, longitude: 74.3587 },
@@ -94,10 +152,6 @@ export const cities: City[] = [
     // Turkey
     { name: 'Istanbul', country: 'TR', latitude: 41.0082, longitude: 28.9784 },
     { name: 'Ankara', country: 'TR', latitude: 39.9334, longitude: 32.8597 },
-
-    // Egypt
-    { name: 'Cairo', country: 'EG', latitude: 30.0444, longitude: 31.2357 },
-    { name: 'Alexandria', country: 'EG', latitude: 31.2001, longitude: 29.9187 },
 
     // Nigeria
     { name: 'Lagos', country: 'NG', latitude: 6.5244, longitude: 3.3792 },
@@ -118,4 +172,7 @@ export const cities: City[] = [
     // South Africa
     { name: 'Cape Town', country: 'ZA', latitude: -33.9249, longitude: 18.4241 },
     { name: 'Johannesburg', country: 'ZA', latitude: -26.2041, longitude: 28.0473 },
+    
+    // Singapore
+    { name: 'Singapore', country: 'SG', latitude: 1.3521, longitude: 103.8198 },
 ];
