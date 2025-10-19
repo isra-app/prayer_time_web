@@ -1,11 +1,27 @@
-
 import type { PrayerTimes, LocationData } from '../types';
+
+interface AladhanDate {
+    readable: string;
+    hijri: {
+        date: string;
+        day: string;
+        month: {
+            number: number;
+            en: string;
+        };
+        year: string;
+        designation: {
+            abbreviated: string;
+        };
+    };
+}
 
 interface AladhanResponse {
     code: number;
     status: string;
     data: {
         timings: PrayerTimes;
+        date: AladhanDate;
     };
 }
 
@@ -14,7 +30,7 @@ interface BigDataCloudResponse {
     countryName: string;
 }
 
-export async function getPrayerTimes(latitude: number, longitude: number, date: string, method: number): Promise<{ timings: PrayerTimes; locationInfo: LocationData }> {
+export async function getPrayerTimes(latitude: number, longitude: number, date: string, method: number): Promise<{ timings: PrayerTimes; locationInfo: LocationData; hijriDate: string }> {
     // Fetch prayer times
     const prayerApiUrl = `https://api.aladhan.com/v1/timings/${date}?latitude=${latitude}&longitude=${longitude}&method=${method}`;
     const prayerResponse = await fetch(prayerApiUrl);
@@ -31,11 +47,15 @@ export async function getPrayerTimes(latitude: number, longitude: number, date: 
     }
     const locationData: BigDataCloudResponse = await locationResponse.json();
 
+    const hijri = prayerData.data.date.hijri;
+    const formattedHijriDate = `${hijri.day} ${hijri.month.en} ${hijri.year} ${hijri.designation.abbreviated}`;
+
     return {
         timings: prayerData.data.timings,
         locationInfo: {
             city: locationData.city || 'Unknown City',
             countryName: locationData.countryName || 'Unknown Country',
-        }
+        },
+        hijriDate: formattedHijriDate,
     };
 }

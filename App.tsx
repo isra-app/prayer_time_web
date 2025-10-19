@@ -5,6 +5,7 @@ import { countries, cities } from './data/cities';
 import { FajrIcon, DhuhrIcon, AsrIcon, MaghribIcon, IshaIcon, SunriseIcon } from './components/PrayerIcons';
 import PrayerTimeCard from './components/PrayerTimeCard';
 import LoadingSpinner from './components/LoadingSpinner';
+import TimeOfDayVisual from './components/TimeOfDayVisual';
 
 type UIState = 'manual' | 'loading' | 'loaded' | 'error';
 const LOCAL_STORAGE_KEY = 'prayer-times-location-v3';
@@ -62,6 +63,7 @@ const App: React.FC = () => {
     const [prayerTimes, setPrayerTimes] = useState<PrayerTimes | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [currentDate, setCurrentDate] = useState<string>('');
+    const [hijriDate, setHijriDate] = useState<string>('');
     const [currentTime, setCurrentTime] = useState<string>('');
     const [currentPrayerName, setCurrentPrayerName] = useState<string | null>(null);
     const [nextPrayerName, setNextPrayerName] = useState<string | null>(null);
@@ -74,10 +76,6 @@ const App: React.FC = () => {
     const [selectedCity, setSelectedCity] = useState<string>('');
     const [activeMethodName, setActiveMethodName] = useState<string>('');
 
-    // State for notifications
-    const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
-    const [notificationTimeouts, setNotificationTimeouts] = useState<number[]>([]);
-
     useEffect(() => {
         const timer = setInterval(() => {
             setCurrentTime(new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }));
@@ -86,73 +84,6 @@ const App: React.FC = () => {
             clearInterval(timer);
         };
     }, []);
-
-    const requestNotificationPermission = useCallback(async () => {
-        if (!('Notification' in window)) {
-            console.warn('This browser does not support desktop notification');
-            return;
-        }
-        try {
-            const permission = await Notification.requestPermission();
-            setNotificationPermission(permission);
-        } catch (error) {
-            console.error("Error requesting notification permission:", error);
-        }
-    }, []);
-
-    // Effect to check and request notification permission on initial mount
-    useEffect(() => {
-        if ('Notification' in window) {
-            const currentPermission = Notification.permission;
-            setNotificationPermission(currentPermission);
-            if (currentPermission === 'default') {
-                requestNotificationPermission();
-            }
-        }
-    }, [requestNotificationPermission]);
-
-    // Effect to schedule notifications when dependencies change
-    useEffect(() => {
-        // 1. Clear any existing timeouts
-        notificationTimeouts.forEach(clearTimeout);
-        setNotificationTimeouts([]);
-
-        // 2. Check if we should schedule new notifications
-        if (notificationPermission !== 'granted' || !prayerTimes) {
-            return;
-        }
-
-        // 3. Schedule new notifications
-        const timeouts: number[] = [];
-        const now = new Date();
-
-        const prayersToSchedule = Object.entries(prayerTimes)
-            .filter(([name]) => ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'].includes(name));
-
-        prayersToSchedule.forEach(([name, time]) => {
-            const [hours, minutes] = time.split(':').map(Number);
-            const prayerDate = new Date();
-            prayerDate.setHours(hours, minutes, 0, 0);
-
-            if (prayerDate > now) {
-                const delay = prayerDate.getTime() - now.getTime();
-                const timeoutId = setTimeout(() => {
-                    new Notification(`It's time for ${name}`, {
-                        body: `The time for ${name} prayer has begun.`,
-                        icon: '/favicon.svg'
-                    });
-                }, delay);
-                timeouts.push(timeoutId);
-            }
-        });
-
-        setNotificationTimeouts(timeouts);
-
-        // 4. Return cleanup function
-        return () => {
-            timeouts.forEach(clearTimeout);
-        };
-    }, [prayerTimes, notificationPermission]);
 
     const updatePrayerStatus = useCallback(() => {
         if (!prayerTimes) {
@@ -252,8 +183,9 @@ const App: React.FC = () => {
             const dateString = `${today.getDate()}-${today.getMonth() + 1}-${today.getFullYear()}`;
             setCurrentDate(today.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }));
             
-            const { timings, locationInfo } = await getPrayerTimes(latitude, longitude, dateString, method);
+            const { timings, locationInfo, hijriDate } = await getPrayerTimes(latitude, longitude, dateString, method);
             setPrayerTimes(timings);
+            setHijriDate(hijriDate);
             setLocationData({
                 city: locationInfo.city !== 'Unknown City' ? locationInfo.city : cityName || 'Selected Location',
                 countryName: locationInfo.countryName,
@@ -329,29 +261,6 @@ const App: React.FC = () => {
             }
         }
     };
-
-    const handleTestNotification = useCallback(() => {
-        if (!('Notification' in window)) {
-            alert('This browser does not support desktop notifications.');
-            return;
-        }
-
-        switch (notificationPermission) {
-            case 'granted':
-                new Notification('Test Notification', {
-                    body: 'If you see this, notifications are working!',
-                    icon: '/favicon.svg'
-                });
-                break;
-            case 'denied':
-                alert('Notification permission has been denied. Please enable it in your browser settings.');
-                break;
-            case 'default':
-                alert('Please grant permission to receive notifications.');
-                requestNotificationPermission();
-                break;
-        }
-    }, [notificationPermission, requestNotificationPermission]);
 
     const prayerSchedule: Prayer[] = prayerTimes ? [
         { name: 'Fajr', time: prayerTimes.Fajr, icon: <FajrIcon /> },
@@ -435,17 +344,16 @@ const App: React.FC = () => {
                     return (
                         <>
                             <div className="text-center mb-8">
+                                <TimeOfDayVisual currentPrayer={currentPrayerName} />
                                 <h1 className="text-4xl md:text-5xl font-bold text-[#158C6E] tracking-wider">{locationData.city}</h1>
                                 <p className="text-lg text-gray-600">{locationData.countryName}</p>
                                 <p className="text-sm text-gray-500 mt-1">Using: {activeMethodName}</p>
                                 <p className="mt-4 text-md text-gray-700">{currentDate}</p>
+                                <p className="text-md text-gray-500">{hijriDate}</p>
                                 <p className="mt-2 text-3xl font-semibold text-gray-900">{currentTime}</p>
                                 <div className="mt-4 flex justify-center items-center gap-4">
                                     <button onClick={() => setUiState('manual')} className="text-sm text-[#158C6E] hover:underline">
                                         Change Location
-                                    </button>
-                                     <button onClick={handleTestNotification} className="text-sm text-blue-600 hover:underline">
-                                        Test Notification
                                     </button>
                                 </div>
                             </div>
