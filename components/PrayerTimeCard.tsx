@@ -5,10 +5,9 @@ interface PrayerTimeCardProps {
     prayer: Prayer;
     isCurrent?: boolean;
     isNext?: boolean;
-    countdown?: string;
 }
 
-const PrayerTimeCard: React.FC<PrayerTimeCardProps> = ({ prayer, isCurrent = false, isNext = false, countdown }) => {
+const PrayerTimeCard: React.FC<PrayerTimeCardProps> = ({ prayer, isCurrent = false, isNext = false }) => {
     
     const formatTo12Hour = (time24: string): string => {
         if (!time24) return '';
@@ -24,8 +23,8 @@ const PrayerTimeCard: React.FC<PrayerTimeCardProps> = ({ prayer, isCurrent = fal
 
     const cardClasses = [
         'relative bg-white bg-opacity-60 backdrop-blur-sm p-2 rounded-xl shadow-md border text-center flex flex-col justify-between items-center transition-all duration-300 hover:bg-white hover:shadow-lg hover:scale-105 flex-1 min-w-[120px]',
-        isCurrent ? 'border-transparent ring-2 ring-[#158C6E] shadow-xl scale-105' :
-        isNext ? 'border-transparent ring-2 ring-blue-500 shadow-xl scale-105' :
+        isCurrent ? 'border-transparent ring-2 ring-blue-500 shadow-xl scale-105' :
+        isNext ? 'border-transparent ring-2 ring-[#158C6E] shadow-xl scale-105' :
         'border-gray-200/80'
     ].join(' ');
 
@@ -36,11 +35,6 @@ const PrayerTimeCard: React.FC<PrayerTimeCardProps> = ({ prayer, isCurrent = fal
             </div>
             <h3 className="text-sm font-semibold text-gray-700">{prayer.name}</h3>
             <p className="text-lg font-bold text-gray-900">{formatTo12Hour(prayer.time)}</p>
-            {isNext && countdown && (
-                <div className="mt-1 text-xs font-semibold text-blue-600">
-                    <span>{countdown}</span>
-                </div>
-            )}
         </div>
     );
 };

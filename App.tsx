@@ -5,7 +5,6 @@ import { countries, cities } from './data/cities';
 import { FajrIcon, DhuhrIcon, AsrIcon, MaghribIcon, IshaIcon, SunriseIcon } from './components/PrayerIcons';
 import PrayerTimeCard from './components/PrayerTimeCard';
 import LoadingSpinner from './components/LoadingSpinner';
-import TimeOfDayVisual from './components/TimeOfDayVisual';
 
 type UIState = 'manual' | 'loading' | 'loaded' | 'error';
 const LOCAL_STORAGE_KEY = 'prayer-times-location-v3';
@@ -178,6 +177,8 @@ const App: React.FC = () => {
         setUiState('loading');
         setError(null);
         setPrayerTimes(null);
+        setLocationData(null);
+        setHijriDate('');
         try {
             const today = new Date();
             const dateString = `${today.getDate()}-${today.getMonth() + 1}-${today.getFullYear()}`;
@@ -185,11 +186,11 @@ const App: React.FC = () => {
             
             const { timings, locationInfo, hijriDate } = await getPrayerTimes(latitude, longitude, dateString, method);
             setPrayerTimes(timings);
-            setHijriDate(hijriDate);
             setLocationData({
                 city: locationInfo.city !== 'Unknown City' ? locationInfo.city : cityName || 'Selected Location',
                 countryName: locationInfo.countryName,
             });
+            setHijriDate(hijriDate);
             setActiveMethodName(calculationMethodNames[method] || 'Default Method');
             setUiState('loaded');
         } catch (err) {
@@ -344,13 +345,17 @@ const App: React.FC = () => {
                     return (
                         <>
                             <div className="text-center mb-8">
-                                <TimeOfDayVisual currentPrayer={currentPrayerName} />
                                 <h1 className="text-4xl md:text-5xl font-bold text-[#158C6E] tracking-wider">{locationData.city}</h1>
                                 <p className="text-lg text-gray-600">{locationData.countryName}</p>
                                 <p className="text-sm text-gray-500 mt-1">Using: {activeMethodName}</p>
                                 <p className="mt-4 text-md text-gray-700">{currentDate}</p>
-                                <p className="text-md text-gray-500">{hijriDate}</p>
+                                {hijriDate && <p className="text-md text-gray-500">{hijriDate}</p>}
                                 <p className="mt-2 text-3xl font-semibold text-gray-900">{currentTime}</p>
+                                {nextPrayerName && timeToNextPrayer && (
+                                    <div className="mt-2 text-2xl text-[#158C6E] font-medium" aria-live="polite">
+                                        Next Prayer: {nextPrayerName} in <span className="font-semibold tabular-nums">{timeToNextPrayer}</span>
+                                    </div>
+                                )}
                                 <div className="mt-4 flex justify-center items-center gap-4">
                                     <button onClick={() => setUiState('manual')} className="text-sm text-[#158C6E] hover:underline">
                                         Change Location
@@ -364,7 +369,6 @@ const App: React.FC = () => {
                                         prayer={prayer} 
                                         isCurrent={prayer.name === currentPrayerName}
                                         isNext={prayer.name === nextPrayerName}
-                                        countdown={prayer.name === nextPrayerName ? timeToNextPrayer : undefined}
                                      />
                                 ))}
                             </div>
