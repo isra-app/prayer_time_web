@@ -4,23 +4,23 @@ interface TimeOfDayVisualProps {
     currentPrayer: string | null;
 }
 
-const prayerToGifMap: { [key: string]: string } = {
-    Fajr: 'https://media.giphy.com/media/3oFzmhYBKsIsSg3pyU/giphy.gif',
-    Sunrise: 'https://media.giphy.com/media/3oFzmhYBKsIsSg3pyU/giphy.gif',
-    Dhuhr: 'https://media.giphy.com/media/3o7TKtnFxAhtd4PMaI/giphy.gif',
-    Asr: 'https://media.giphy.com/media/1P6T2pL7d66p2/giphy.gif',
-    Maghrib: 'https://media.giphy.com/media/3og0IMJcSIa7r5m3gA/giphy.gif',
-    Isha: 'https://media.giphy.com/media/3og0IMJcSIa7r5m3gA/giphy.gif',
+const prayerToImageMap: { [key: string]: string } = {
+    Fajr: 'https://static.vecteezy.com/system/resources/previews/021/458/598/original/cute-sun-cartoon-icon-illustration-vector.jpg',
+    Sunrise: 'https://static.vecteezy.com/system/resources/previews/021/458/598/original/cute-sun-cartoon-icon-illustration-vector.jpg',
+    Dhuhr: 'https://img.freepik.com/free-vector/flat-sun-illustration_23-2148890288.jpg',
+    Asr: 'https://static.vecteezy.com/system/resources/previews/022/806/335/original/cute-sunset-illustration-on-transparent-background-free-png.png',
+    Maghrib: 'https://static.vecteezy.com/system/resources/previews/009/302/831/original/cute-moon-and-stars-kawaii-character-sticker-free-vector.jpg',
+    Isha: 'https://static.vecteezy.com/system/resources/previews/009/302/831/original/cute-moon-and-stars-kawaii-character-sticker-free-vector.jpg',
 };
 
-const defaultGif = prayerToGifMap.Dhuhr; // Default to a sunny day GIF
+const defaultImage = prayerToImageMap.Dhuhr; // Default to a sunny day image
 
 const TimeOfDayVisual: React.FC<TimeOfDayVisualProps> = ({ currentPrayer }) => {
-    const gifUrl = currentPrayer ? (prayerToGifMap[currentPrayer] || defaultGif) : defaultGif;
+    const imageUrl = currentPrayer ? (prayerToImageMap[currentPrayer] || defaultImage) : defaultImage;
 
     return (
         <div className="w-24 h-24 mx-auto mb-4 rounded-full overflow-hidden shadow-lg border-4 border-white">
-            <img src={gifUrl} alt="Visual representation for the time of day" className="w-full h-full object-cover" />
+            <img src={imageUrl} alt="Cute visual for the time of day" className="w-full h-full object-cover" />
         </div>
     );
 };
