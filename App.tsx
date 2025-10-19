@@ -5,9 +5,11 @@ import { countries, cities } from './data/cities';
 import { FajrIcon, DhuhrIcon, AsrIcon, MaghribIcon, IshaIcon, SunriseIcon } from './components/PrayerIcons';
 import PrayerTimeCard from './components/PrayerTimeCard';
 import LoadingSpinner from './components/LoadingSpinner';
+import NotificationToggle from './components/NotificationToggle';
 
 type UIState = 'manual' | 'loading' | 'loaded' | 'error';
-const LOCAL_STORAGE_KEY = 'prayer-times-location-v3'; // Updated key for new data structure
+const LOCAL_STORAGE_KEY = 'prayer-times-location-v3';
+const LOCAL_STORAGE_KEY_NOTIFICATIONS = 'prayer-times-notifications-enabled';
 const DEFAULT_CITY_NAME = 'Kozhikode';
 
 const calculationMethodNames: { [key: number]: string } = {
@@ -74,6 +76,11 @@ const App: React.FC = () => {
     const [selectedCity, setSelectedCity] = useState<string>('');
     const [activeMethodName, setActiveMethodName] = useState<string>('');
 
+    // State for notifications
+    const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(false);
+    const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
+    const [notificationTimeouts, setNotificationTimeouts] = useState<number[]>([]);
+
     useEffect(() => {
         const timer = setInterval(() => {
             setCurrentTime(new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }));
@@ -82,6 +89,64 @@ const App: React.FC = () => {
             clearInterval(timer);
         };
     }, []);
+
+    // Effect to check and load notification settings on initial mount
+    useEffect(() => {
+        if ('Notification' in window) {
+            setNotificationPermission(Notification.permission);
+            const savedSetting = localStorage.getItem(LOCAL_STORAGE_KEY_NOTIFICATIONS);
+            if (savedSetting === 'true' && Notification.permission === 'granted') {
+                setNotificationsEnabled(true);
+            } else {
+                setNotificationsEnabled(false);
+            }
+        } else {
+            console.warn('This browser does not support desktop notification');
+        }
+    }, []);
+
+    // Effect to schedule notifications when dependencies change
+    useEffect(() => {
+        // 1. Clear any existing timeouts
+        notificationTimeouts.forEach(clearTimeout);
+        setNotificationTimeouts([]);
+
+        // 2. Check if we should schedule new notifications
+        if (!notificationsEnabled || notificationPermission !== 'granted' || !prayerTimes) {
+            return;
+        }
+
+        // 3. Schedule new notifications
+        const timeouts: number[] = [];
+        const now = new Date();
+
+        const prayersToSchedule = Object.entries(prayerTimes)
+            .filter(([name]) => ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'].includes(name));
+
+        prayersToSchedule.forEach(([name, time]) => {
+            const [hours, minutes] = time.split(':').map(Number);
+            const prayerDate = new Date();
+            prayerDate.setHours(hours, minutes, 0, 0);
+
+            if (prayerDate > now) {
+                const delay = prayerDate.getTime() - now.getTime();
+                const timeoutId = setTimeout(() => {
+                    new Notification(`It's time for ${name}`, {
+                        body: `The time for ${name} prayer has begun.`,
+                        icon: '/favicon.svg'
+                    });
+                }, delay);
+                timeouts.push(timeoutId);
+            }
+        });
+
+        setNotificationTimeouts(timeouts);
+
+        // 4. Return cleanup function
+        return () => {
+            timeouts.forEach(clearTimeout);
+        };
+    }, [prayerTimes, notificationsEnabled, notificationPermission]);
 
     const updatePrayerStatus = useCallback(() => {
         if (!prayerTimes) {
@@ -258,6 +323,27 @@ const App: React.FC = () => {
             }
         }
     };
+    
+    const handleNotificationToggle = (enabled: boolean) => {
+        setNotificationsEnabled(enabled);
+        localStorage.setItem(LOCAL_STORAGE_KEY_NOTIFICATIONS, String(enabled));
+    };
+    
+    const requestNotificationPermission = async () => {
+        if (!('Notification' in window)) return;
+        try {
+            const permission = await Notification.requestPermission();
+            setNotificationPermission(permission);
+            if (permission === 'granted') {
+                handleNotificationToggle(true);
+            } else {
+                handleNotificationToggle(false);
+            }
+        } catch (error) {
+            console.error("Error requesting notification permission:", error);
+        }
+    };
+
 
     const prayerSchedule: Prayer[] = prayerTimes ? [
         { name: 'Fajr', time: prayerTimes.Fajr, icon: <FajrIcon /> },
@@ -346,9 +432,17 @@ const App: React.FC = () => {
                                 <p className="text-sm text-gray-500 mt-1">Using: {activeMethodName}</p>
                                 <p className="mt-4 text-md text-gray-700">{currentDate}</p>
                                 <p className="mt-2 text-3xl font-semibold text-gray-900">{currentTime}</p>
-                                <button onClick={() => setUiState('manual')} className="mt-4 text-sm text-[#158C6E] hover:underline">
-                                    Change Location
-                                </button>
+                                <div className="mt-4 flex flex-col items-center space-y-2">
+                                     <NotificationToggle
+                                        isEnabled={notificationsEnabled}
+                                        onToggle={handleNotificationToggle}
+                                        permission={notificationPermission}
+                                        requestPermission={requestNotificationPermission}
+                                    />
+                                    <button onClick={() => setUiState('manual')} className="text-sm text-[#158C6E] hover:underline">
+                                        Change Location
+                                    </button>
+                                </div>
                             </div>
                             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 md:gap-6">
                                 {prayerSchedule.map((prayer) => (
