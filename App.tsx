@@ -5,11 +5,9 @@ import { countries, cities } from './data/cities';
 import { FajrIcon, DhuhrIcon, AsrIcon, MaghribIcon, IshaIcon, SunriseIcon } from './components/PrayerIcons';
 import PrayerTimeCard from './components/PrayerTimeCard';
 import LoadingSpinner from './components/LoadingSpinner';
-import NotificationToggle from './components/NotificationToggle';
 
 type UIState = 'manual' | 'loading' | 'loaded' | 'error';
 const LOCAL_STORAGE_KEY = 'prayer-times-location-v3';
-const LOCAL_STORAGE_KEY_NOTIFICATIONS = 'prayer-times-notifications-enabled';
 const DEFAULT_CITY_NAME = 'Kozhikode';
 
 const calculationMethodNames: { [key: number]: string } = {
@@ -77,7 +75,6 @@ const App: React.FC = () => {
     const [activeMethodName, setActiveMethodName] = useState<string>('');
 
     // State for notifications
-    const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(false);
     const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
     const [notificationTimeouts, setNotificationTimeouts] = useState<number[]>([]);
 
@@ -90,20 +87,29 @@ const App: React.FC = () => {
         };
     }, []);
 
-    // Effect to check and load notification settings on initial mount
-    useEffect(() => {
-        if ('Notification' in window) {
-            setNotificationPermission(Notification.permission);
-            const savedSetting = localStorage.getItem(LOCAL_STORAGE_KEY_NOTIFICATIONS);
-            if (savedSetting === 'true' && Notification.permission === 'granted') {
-                setNotificationsEnabled(true);
-            } else {
-                setNotificationsEnabled(false);
-            }
-        } else {
+    const requestNotificationPermission = useCallback(async () => {
+        if (!('Notification' in window)) {
             console.warn('This browser does not support desktop notification');
+            return;
+        }
+        try {
+            const permission = await Notification.requestPermission();
+            setNotificationPermission(permission);
+        } catch (error) {
+            console.error("Error requesting notification permission:", error);
         }
     }, []);
+
+    // Effect to check and request notification permission on initial mount
+    useEffect(() => {
+        if ('Notification' in window) {
+            const currentPermission = Notification.permission;
+            setNotificationPermission(currentPermission);
+            if (currentPermission === 'default') {
+                requestNotificationPermission();
+            }
+        }
+    }, [requestNotificationPermission]);
 
     // Effect to schedule notifications when dependencies change
     useEffect(() => {
@@ -112,7 +118,7 @@ const App: React.FC = () => {
         setNotificationTimeouts([]);
 
         // 2. Check if we should schedule new notifications
-        if (!notificationsEnabled || notificationPermission !== 'granted' || !prayerTimes) {
+        if (notificationPermission !== 'granted' || !prayerTimes) {
             return;
         }
 
@@ -146,7 +152,7 @@ const App: React.FC = () => {
         return () => {
             timeouts.forEach(clearTimeout);
         };
-    }, [prayerTimes, notificationsEnabled, notificationPermission]);
+    }, [prayerTimes, notificationPermission]);
 
     const updatePrayerStatus = useCallback(() => {
         if (!prayerTimes) {
@@ -323,27 +329,29 @@ const App: React.FC = () => {
             }
         }
     };
-    
-    const handleNotificationToggle = (enabled: boolean) => {
-        setNotificationsEnabled(enabled);
-        localStorage.setItem(LOCAL_STORAGE_KEY_NOTIFICATIONS, String(enabled));
-    };
-    
-    const requestNotificationPermission = async () => {
-        if (!('Notification' in window)) return;
-        try {
-            const permission = await Notification.requestPermission();
-            setNotificationPermission(permission);
-            if (permission === 'granted') {
-                handleNotificationToggle(true);
-            } else {
-                handleNotificationToggle(false);
-            }
-        } catch (error) {
-            console.error("Error requesting notification permission:", error);
-        }
-    };
 
+    const handleTestNotification = useCallback(() => {
+        if (!('Notification' in window)) {
+            alert('This browser does not support desktop notifications.');
+            return;
+        }
+
+        switch (notificationPermission) {
+            case 'granted':
+                new Notification('Test Notification', {
+                    body: 'If you see this, notifications are working!',
+                    icon: '/favicon.svg'
+                });
+                break;
+            case 'denied':
+                alert('Notification permission has been denied. Please enable it in your browser settings.');
+                break;
+            case 'default':
+                alert('Please grant permission to receive notifications.');
+                requestNotificationPermission();
+                break;
+        }
+    }, [notificationPermission, requestNotificationPermission]);
 
     const prayerSchedule: Prayer[] = prayerTimes ? [
         { name: 'Fajr', time: prayerTimes.Fajr, icon: <FajrIcon /> },
@@ -432,15 +440,12 @@ const App: React.FC = () => {
                                 <p className="text-sm text-gray-500 mt-1">Using: {activeMethodName}</p>
                                 <p className="mt-4 text-md text-gray-700">{currentDate}</p>
                                 <p className="mt-2 text-3xl font-semibold text-gray-900">{currentTime}</p>
-                                <div className="mt-4 flex flex-col items-center space-y-2">
-                                     <NotificationToggle
-                                        isEnabled={notificationsEnabled}
-                                        onToggle={handleNotificationToggle}
-                                        permission={notificationPermission}
-                                        requestPermission={requestNotificationPermission}
-                                    />
+                                <div className="mt-4 flex justify-center items-center gap-4">
                                     <button onClick={() => setUiState('manual')} className="text-sm text-[#158C6E] hover:underline">
                                         Change Location
+                                    </button>
+                                     <button onClick={handleTestNotification} className="text-sm text-blue-600 hover:underline">
+                                        Test Notification
                                     </button>
                                 </div>
                             </div>
