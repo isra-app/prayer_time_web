@@ -70,13 +70,11 @@ const App: React.FC = () => {
     const [timeToNextPrayer, setTimeToNextPrayer] = useState<string | null>(null);
     const [uiState, setUiState] = useState('loading' as UIState);
 
-    // State for manual selection
     const [selectedCountry, setSelectedCountry] = useState<string>('');
     const [availableCities, setAvailableCities] = useState<City[]>([]);
     const [selectedCity, setSelectedCity] = useState<string>('');
     const [activeMethodName, setActiveMethodName] = useState<string>('');
 
-    // State for custom coordinates
     const [manualLat, setManualLat] = useState<string>('');
     const [manualLong, setManualLong] = useState<string>('');
 
@@ -84,21 +82,13 @@ const App: React.FC = () => {
         const timer = setInterval(() => {
             setCurrentTime(new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }));
         }, 1000);
-        return () => {
-            clearInterval(timer);
-        };
+        return () => clearInterval(timer);
     }, []);
 
     const updatePrayerStatus = useCallback(() => {
-        if (!prayerTimes) {
-            setCurrentPrayerName(null);
-            setNextPrayerName(null);
-            return;
-        }
-
+        if (!prayerTimes) return;
         const now = new Date();
         const currentTimeInMinutes = now.getHours() * 60 + now.getMinutes();
-
         const prayersWithMinutes = (Object.entries(prayerTimes) as [string, string][])
             .filter(([name]) => ['Fajr', 'Sunrise', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'].includes(name))
             .map(([name, time]) => {
@@ -107,26 +97,18 @@ const App: React.FC = () => {
             })
             .sort((a, b) => a.timeInMinutes - b.timeInMinutes);
 
-        let currentPrayer: { name: string; timeInMinutes: number } | null = null;
-        let nextPrayer: { name: string; timeInMinutes: number } | null = null;
-        
-        const passedPrayers = prayersWithMinutes.filter(p => p.timeInMinutes <= currentTimeInMinutes);
-        if (passedPrayers.length > 0) {
-            currentPrayer = passedPrayers[passedPrayers.length - 1];
-        } else {
-            currentPrayer = prayersWithMinutes.find(p => p.name === 'Isha') || prayersWithMinutes[prayersWithMinutes.length - 1];
-        }
-        
-        const upcomingPrayers = prayersWithMinutes.filter(p => p.timeInMinutes > currentTimeInMinutes);
-        if (upcomingPrayers.length > 0) {
-            nextPrayer = upcomingPrayers[0];
-        } else {
-            nextPrayer = prayersWithMinutes[0];
+        let currentPrayer = prayersWithMinutes[prayersWithMinutes.length - 1];
+        let nextPrayer = prayersWithMinutes[0];
+
+        for (let i = 0; i < prayersWithMinutes.length; i++) {
+            if (currentTimeInMinutes >= prayersWithMinutes[i].timeInMinutes) {
+                currentPrayer = prayersWithMinutes[i];
+                nextPrayer = prayersWithMinutes[(i + 1) % prayersWithMinutes.length];
+            }
         }
 
-        setCurrentPrayerName(currentPrayer ? currentPrayer.name : null);
-        setNextPrayerName(nextPrayer ? nextPrayer.name : null);
-
+        setCurrentPrayerName(currentPrayer.name);
+        setNextPrayerName(nextPrayer.name);
     }, [prayerTimes]);
 
     useEffect(() => {
@@ -134,45 +116,24 @@ const App: React.FC = () => {
         const interval = setInterval(updatePrayerStatus, 60000);
         return () => clearInterval(interval);
     }, [updatePrayerStatus]);
-    
-    useEffect(() => {
-        if (!nextPrayerName || !prayerTimes) {
-            setTimeToNextPrayer(null);
-            return;
-        }
 
+    useEffect(() => {
+        if (!nextPrayerName || !prayerTimes) return;
         const timerInterval = setInterval(() => {
             const nextPrayerTimeStr = prayerTimes[nextPrayerName as keyof PrayerTimes];
             if (!nextPrayerTimeStr) return;
-
             const now = new Date();
             const [hours, minutes] = nextPrayerTimeStr.split(':').map(Number);
-
-            let nextPrayerDate = new Date();
-            nextPrayerDate.setHours(hours, minutes, 0, 0);
-
-            if (nextPrayerDate < now) {
-                nextPrayerDate.setDate(nextPrayerDate.getDate() + 1);
-            }
-
-            const diff = nextPrayerDate.getTime() - now.getTime();
-
-            if (diff < 0) {
-                setTimeToNextPrayer(null);
-                return;
-            }
-
+            let nextDate = new Date();
+            nextDate.setHours(hours, minutes, 0, 0);
+            if (nextDate < now) nextDate.setDate(nextDate.getDate() + 1);
+            const diff = nextDate.getTime() - now.getTime();
             const h = Math.floor(diff / (1000 * 60 * 60));
             const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
             const s = Math.floor((diff % (1000 * 60)) / 1000);
-
-            const formattedTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-            setTimeToNextPrayer(formattedTime);
-
+            setTimeToNextPrayer(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`);
         }, 1000);
-
         return () => clearInterval(timerInterval);
-
     }, [nextPrayerName, prayerTimes]);
 
     const fetchPrayerData = useCallback(async (latitude: number, longitude: number, method: number, cityName?: string) => {
@@ -181,241 +142,170 @@ const App: React.FC = () => {
         try {
             const today = new Date();
             const dateString = `${today.getDate()}-${today.getMonth() + 1}-${today.getFullYear()}`;
-            setCurrentDate(today.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }));
-            
             const { timings, locationInfo, hijriDate } = await getPrayerTimes(latitude, longitude, dateString, method);
             setPrayerTimes(timings);
             setLocationData({
-                city: cityName || (locationInfo.city !== 'Unknown City' ? locationInfo.city : 'Selected Location'),
+                city: cityName || (locationInfo.city !== 'Unknown City' ? locationInfo.city : 'Custom Location'),
                 countryName: locationInfo.countryName,
             });
             setHijriDate(hijriDate);
-            setActiveMethodName(calculationMethodNames[method] || 'Default Method');
+            setActiveMethodName(calculationMethodNames[method] || 'Standard');
+            setCurrentDate(today.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }));
             setUiState('loaded');
         } catch (err) {
-            setError('Could not fetch prayer times. Please try again later.');
+            setError('Could not fetch data. Please try again.');
             setUiState('error');
-            console.error(err);
         }
     }, []);
 
     useEffect(() => {
-        const loadSavedOrDefaultLocation = () => {
-            try {
-                const savedDataJson = localStorage.getItem(LOCAL_STORAGE_KEY);
-                let locationToLoad: City | undefined;
-
-                if (savedDataJson) {
-                    const savedData = JSON.parse(savedDataJson) as SavedData;
-                    locationToLoad = cities.find(c => c.name === savedData.city.name && c.country === savedData.city.country);
-                }
-                
-                if (!locationToLoad) {
-                    locationToLoad = cities.find(c => c.name === DEFAULT_CITY_NAME);
-                }
-
-                if (locationToLoad) {
-                    const countryCode = locationToLoad.country;
-                    const method = getMethodForCountry(countryCode);
-                    setSelectedCountry(countryCode);
-                    setAvailableCities(cities.filter(c => c.country === countryCode));
-                    setSelectedCity(locationToLoad.name);
-                    fetchPrayerData(locationToLoad.latitude, locationToLoad.longitude, method, locationToLoad.name);
-                } else {
-                    setUiState('manual');
-                }
-            } catch (e) {
-                 setUiState('manual');
+        const loadInitial = () => {
+            const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
+            let city = cities.find(c => c.name === DEFAULT_CITY_NAME);
+            if (saved) {
+                const parsed = JSON.parse(saved) as SavedData;
+                city = cities.find(c => c.name === parsed.city.name) || city;
+            }
+            if (city) {
+                fetchPrayerData(city.latitude, city.longitude, getMethodForCountry(city.country), city.name);
+            } else {
+                setUiState('manual');
             }
         };
-        loadSavedOrDefaultLocation();
+        loadInitial();
     }, [fetchPrayerData]);
 
-    const handleCountryChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-        const countryCode = event.target.value;
-        setSelectedCountry(countryCode);
-        setSelectedCity('');
-        setAvailableCities(cities.filter(c => c.country === countryCode));
+    const handleCountryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const code = e.target.value;
+        setSelectedCountry(code);
+        setAvailableCities(cities.filter(c => c.country === code));
     };
 
-    const handleCityChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-        const cityName = event.target.value;
-        setSelectedCity(cityName);
-        const city = cities.find(c => c.name === cityName && c.country === selectedCountry);
+    const handleCityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const name = e.target.value;
+        const city = cities.find(c => c.name === name && c.country === selectedCountry);
         if (city) {
-            const method = getMethodForCountry(city.country);
-            fetchPrayerData(city.latitude, city.longitude, method, city.name);
+            fetchPrayerData(city.latitude, city.longitude, getMethodForCountry(city.country), city.name);
             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({ city }));
         }
     };
 
-    const handleManualCoordinates = (e: React.FormEvent) => {
+    const handleManual = (e: React.FormEvent) => {
         e.preventDefault();
         const lat = parseFloat(manualLat);
-        const long = parseFloat(manualLong);
-        if (isNaN(lat) || isNaN(long)) {
-            setError("Please enter valid numeric coordinates.");
-            return;
-        }
-        // Using method 1 (Muslim World League) as default for custom coordinates
-        fetchPrayerData(lat, long, 1);
+        const lon = parseFloat(manualLong);
+        if (!isNaN(lat) && !isNaN(lon)) fetchPrayerData(lat, lon, 1);
     };
 
-    const prayerSchedule: Prayer[] = prayerTimes ? [
-        { name: 'Fajr', time: prayerTimes.Fajr, icon: <FajrIcon /> },
-        { name: 'Sunrise', time: prayerTimes.Sunrise, icon: <SunriseIcon /> },
-        { name: 'Dhuhr', time: prayerTimes.Dhuhr, icon: <DhuhrIcon /> },
-        { name: 'Asr', time: prayerTimes.Asr, icon: <AsrIcon /> },
-        { name: 'Maghrib', time: prayerTimes.Maghrib, icon: <MaghribIcon /> },
-        { name: 'Isha', time: prayerTimes.Isha, icon: <IshaIcon /> },
-    ] : [];
-
     const renderContent = () => {
-        switch (uiState) {
-            case 'manual':
-                 return (
-                    <div className="text-center w-full max-w-md mx-auto">
-                        <h1 className="text-3xl font-bold text-gray-800 mb-2">Select Your Location</h1>
-                        <p className="text-gray-600 mb-8">Choose a city or enter custom coordinates.</p>
-                        <div className="space-y-4 mb-10">
-                             <div className="relative">
-                                <select
-                                    value={selectedCountry}
-                                    onChange={handleCountryChange}
-                                    className="w-full appearance-none bg-white border border-gray-300 rounded-lg py-2 pl-3 pr-10 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#158C6E] transition-colors"
-                                >
-                                    <option value="" disabled>Select a Country</option>
-                                    {countries.map(country => (
-                                        <option key={country.code} value={country.code}>{country.name}</option>
-                                    ))}
-                                </select>
-                                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
-                                    <i className="fa-solid fa-chevron-down text-sm"></i>
-                                </div>
+        if (uiState === 'loading') return (
+            <div className="flex flex-col items-center justify-center h-full">
+                <LoadingSpinner />
+                <p className="mt-4 text-[#158C6E] font-medium">Updating timings...</p>
+            </div>
+        );
+
+        if (uiState === 'error') return (
+            <div className="text-center p-8">
+                <p className="text-red-500 mb-4">{error}</p>
+                <button onClick={() => setUiState('manual')} className="px-6 py-2 bg-[#158C6E] text-white rounded-lg">Try Again</button>
+            </div>
+        );
+
+        if (uiState === 'manual') return (
+            <div className="max-w-md mx-auto w-full px-4 animate-fade-in text-center flex flex-col justify-center h-full">
+                <h1 className="text-3xl font-bold text-gray-800 mb-6">Select Location</h1>
+                <div className="space-y-4 mb-8">
+                    <select value={selectedCountry} onChange={handleCountryChange} className="w-full p-3 border rounded-xl outline-none">
+                        <option value="">Select Country</option>
+                        {countries.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
+                    </select>
+                    <select value={selectedCity} onChange={(e) => {setSelectedCity(e.target.value); handleCityChange(e);}} disabled={!selectedCountry} className="w-full p-3 border rounded-xl outline-none disabled:bg-gray-50">
+                        <option value="">Select City</option>
+                        {availableCities.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
+                    </select>
+                </div>
+                <div className="relative flex items-center mb-8">
+                    <div className="flex-grow border-t border-gray-200"></div>
+                    <span className="flex-shrink mx-4 text-gray-400 text-xs font-bold uppercase">Or Coordinates</span>
+                    <div className="flex-grow border-t border-gray-200"></div>
+                </div>
+                <form onSubmit={handleManual} className="grid grid-cols-2 gap-4">
+                    <input type="text" placeholder="Lat" value={manualLat} onChange={e => setManualLat(e.target.value)} className="p-3 border rounded-xl" />
+                    <input type="text" placeholder="Long" value={manualLong} onChange={e => setManualLong(e.target.value)} className="p-3 border rounded-xl" />
+                    <button type="submit" className="col-span-2 py-3 bg-[#158C6E] text-white rounded-xl font-bold">Show Times</button>
+                </form>
+            </div>
+        );
+
+        if (uiState === 'loaded' && locationData && prayerTimes) {
+            const prayers: Prayer[] = [
+                { name: 'Fajr', time: prayerTimes.Fajr, icon: <FajrIcon /> },
+                { name: 'Sunrise', time: prayerTimes.Sunrise, icon: <SunriseIcon /> },
+                { name: 'Dhuhr', time: prayerTimes.Dhuhr, icon: <DhuhrIcon /> },
+                { name: 'Asr', time: prayerTimes.Asr, icon: <AsrIcon /> },
+                { name: 'Maghrib', time: prayerTimes.Maghrib, icon: <MaghribIcon /> },
+                { name: 'Isha', time: prayerTimes.Isha, icon: <IshaIcon /> },
+            ];
+
+            return (
+                <div className="w-full flex flex-col h-full pt-8 md:pt-16 pb-8 animate-fade-in overflow-hidden">
+                    <header className="text-center mb-6 md:mb-10 flex-shrink-0">
+                        <h1 className="text-4xl md:text-7xl font-extrabold text-[#158C6E] tracking-tighter mb-1 font-sans">
+                            {locationData.city}
+                        </h1>
+                        <p className="text-sm md:text-base text-gray-500 font-medium">{locationData.countryName}</p>
+                        <div className="mt-4 md:mt-6 flex flex-col items-center">
+                            <p className="text-gray-400 text-xs md:text-sm">{currentDate}</p>
+                            <p className="text-gray-400 text-[10px] md:text-xs font-bold uppercase tracking-widest">{hijriDate}</p>
+                        </div>
+                    </header>
+
+                    <section className="flex-grow flex flex-col items-center justify-center min-h-0">
+                        <div className="text-center mb-6 md:mb-12">
+                            <div className="text-5xl md:text-8xl font-black text-gray-900 tabular-nums tracking-tighter leading-none mb-4 md:mb-6">
+                                {currentTime}
                             </div>
-                            <div className="relative">
-                                <select
-                                    value={selectedCity}
-                                    onChange={handleCityChange}
-                                    disabled={!selectedCountry}
-                                    className="w-full appearance-none bg-white border border-gray-300 rounded-lg py-2 pl-3 pr-10 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#158C6E] transition-colors disabled:bg-gray-100"
-                                >
-                                    <option value="" disabled>Select a City</option>
-                                    {availableCities.map(city => (
-                                        <option key={city.name} value={city.name}>{city.name}</option>
-                                    ))}
-                                </select>
-                                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
-                                    <i className="fa-solid fa-chevron-down text-sm"></i>
+                            {nextPrayerName && timeToNextPrayer && (
+                                <div className="inline-flex items-center gap-2 bg-emerald-50 border border-emerald-100 px-4 py-2 md:px-6 md:py-3 rounded-2xl shadow-sm">
+                                    <span className="text-[10px] md:text-xs font-bold text-emerald-800 uppercase tracking-widest">{nextPrayerName} in</span>
+                                    <span className="text-xl md:text-3xl font-black text-[#158C6E] tabular-nums leading-none">{timeToNextPrayer}</span>
                                 </div>
-                            </div>
+                            )}
                         </div>
 
-                        <div className="flex items-center gap-4 mb-8">
-                            <div className="flex-1 h-px bg-gray-200"></div>
-                            <span className="text-gray-400 text-xs font-bold uppercase tracking-wider">Or enter coordinates</span>
-                            <div className="flex-1 h-px bg-gray-200"></div>
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-5 w-full max-w-5xl px-4">
+                            {prayers.map(p => (
+                                <PrayerTimeCard 
+                                    key={p.name} 
+                                    prayer={p} 
+                                    isCurrent={p.name === currentPrayerName} 
+                                    isNext={p.name === nextPrayerName} 
+                                />
+                            ))}
                         </div>
+                    </section>
 
-                        <form onSubmit={handleManualCoordinates} className="grid grid-cols-2 gap-4">
-                            <input 
-                                type="text" 
-                                placeholder="Latitude" 
-                                value={manualLat} 
-                                onChange={(e) => setManualLat(e.target.value)}
-                                className="w-full border border-gray-300 rounded-lg py-2 px-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#158C6E]"
-                            />
-                            <input 
-                                type="text" 
-                                placeholder="Longitude" 
-                                value={manualLong} 
-                                onChange={(e) => setManualLong(e.target.value)}
-                                className="w-full border border-gray-300 rounded-lg py-2 px-3 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#158C6E]"
-                            />
-                            <button 
-                                type="submit" 
-                                className="col-span-2 py-2.5 bg-[#158C6E] text-white rounded-lg font-semibold hover:bg-[#117a5d] transition-colors"
-                            >
-                                Use Coordinates
-                            </button>
-                        </form>
-                    </div>
-                );
-            case 'loading':
-                return (
-                    <div className="flex flex-col items-center justify-center h-full">
-                        <LoadingSpinner />
-                        <p className="mt-4 text-lg text-[#158C6E]">Fetching prayer times...</p>
-                    </div>
-                );
-            case 'error':
-                 return (
-                    <div className="text-center p-8 bg-red-50 rounded-lg border border-red-100">
-                        <p className="text-xl text-red-700">{error}</p>
-                        <button
+                    <footer className="text-center mt-6 md:mt-12 flex-shrink-0 pb-2">
+                        <button 
                             onClick={() => setUiState('manual')}
-                            className="mt-6 px-6 py-2 bg-[#158C6E] text-white hover:bg-[#117a5d] rounded-lg font-semibold transition-colors"
+                            className="text-[11px] md:text-xs font-bold text-[#158C6E] uppercase tracking-widest hover:bg-emerald-50 px-6 py-3 rounded-full transition-all flex items-center gap-2 mx-auto"
                         >
-                            Select Manually
+                            <i className="fa-solid fa-map-location-dot"></i>
+                            Change Location
                         </button>
-                    </div>
-                );
-            case 'loaded':
-                if (locationData && prayerTimes) {
-                    return (
-                        <>
-                            <div className="text-center mb-10 animate-fade-in">
-                                <h1 className="text-5xl md:text-7xl font-extrabold text-[#158C6E] tracking-tight mb-1">
-                                    {locationData.city}
-                                </h1>
-                                <p className="text-lg text-gray-600 font-medium">{locationData.countryName}</p>
-                                <div className="mt-6 space-y-1">
-                                    <p className="text-gray-500 font-medium">{currentDate}</p>
-                                    {hijriDate && <p className="text-gray-400">{hijriDate}</p>}
-                                </div>
-                                <p className="mt-4 text-4xl font-black text-gray-900 tabular-nums">{currentTime}</p>
-                                {nextPrayerName && timeToNextPrayer && (
-                                    <div className="mt-4 text-2xl text-[#158C6E] font-semibold" aria-live="polite">
-                                        {nextPrayerName} in <span className="tabular-nums">{timeToNextPrayer}</span>
-                                    </div>
-                                )}
-                                <div className="mt-8">
-                                    <button 
-                                        onClick={() => setUiState('manual')} 
-                                        className="text-sm font-bold text-[#158C6E] hover:bg-emerald-50 px-4 py-2 rounded-full transition-colors flex items-center gap-2 mx-auto"
-                                    >
-                                        <i className="fa-solid fa-map-location-dot"></i>
-                                        Change Location
-                                    </button>
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 md:gap-6">
-                                {prayerSchedule.map((prayer) => (
-                                    <PrayerTimeCard 
-                                        key={prayer.name} 
-                                        prayer={prayer} 
-                                        isCurrent={prayer.name === currentPrayerName}
-                                        isNext={prayer.name === nextPrayerName}
-                                     />
-                                ))}
-                            </div>
-                            <div className="mt-12 text-center">
-                                <p className="text-xs text-gray-400 uppercase tracking-widest font-bold">Calculation Method</p>
-                                <p className="text-sm text-gray-500">{activeMethodName}</p>
-                            </div>
-                        </>
-                    );
-                }
-                return null;
-            default:
-                return null;
+                        <p className="mt-4 text-[9px] text-gray-300 font-bold uppercase tracking-[0.2em]">Method: {activeMethodName}</p>
+                    </footer>
+                </div>
+            );
         }
+        return null;
     };
 
     return (
-        <div className="min-h-screen bg-white text-gray-800 font-sans p-6 md:p-12 flex flex-col items-center justify-center relative">
-             <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_top,_rgba(21,140,110,0.08),_transparent_50%)] pointer-events-none"></div>
-            <main className="w-full max-w-6xl mx-auto z-10">
+        <div className="h-screen w-screen bg-white text-gray-800 flex flex-col items-center overflow-hidden relative">
+            <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_top,_rgba(21,140,110,0.06),_transparent_60%)] pointer-events-none -z-10"></div>
+            <main className="w-full h-full max-w-7xl mx-auto flex flex-col">
                 {renderContent()}
             </main>
         </div>
