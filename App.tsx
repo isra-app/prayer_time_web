@@ -213,7 +213,7 @@ const App: React.FC = () => {
         );
 
         if (uiState === 'manual') return (
-            <div className="max-w-md mx-auto w-full px-4 animate-fade-in text-center flex flex-col justify-center h-full">
+            <div className="max-w-md mx-auto w-full px-4 animate-fade-in text-center flex flex-col justify-center h-full pt-12">
                 <h1 className="text-3xl font-bold text-gray-800 mb-6">Select Location</h1>
                 <div className="space-y-4 mb-8">
                     <select value={selectedCountry} onChange={handleCountryChange} className="w-full p-3 border rounded-xl outline-none">
@@ -249,7 +249,7 @@ const App: React.FC = () => {
             ];
 
             return (
-                <div className="w-full flex flex-col h-full pt-8 md:pt-16 pb-8 animate-fade-in overflow-hidden">
+                <div className="w-full flex flex-col h-full pt-12 md:pt-24 pb-8 animate-fade-in overflow-hidden">
                     <header className="text-center mb-6 md:mb-10 flex-shrink-0">
                         <h1 className="text-4xl md:text-7xl font-extrabold text-[#158C6E] tracking-tighter mb-1 font-sans">
                             {locationData.city}
@@ -286,7 +286,7 @@ const App: React.FC = () => {
                         </div>
                     </section>
 
-                    <footer className="text-center mt-6 md:mt-12 flex-shrink-0 pb-2">
+                    <footer className="text-center mt-6 md:mt-12 flex-shrink-0 pb-4">
                         <button 
                             onClick={() => setUiState('manual')}
                             className="text-[11px] md:text-xs font-bold text-[#158C6E] uppercase tracking-widest hover:bg-emerald-50 px-6 py-3 rounded-full transition-all flex items-center gap-2 mx-auto"
